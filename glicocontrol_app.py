@@ -11,11 +11,16 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from werkzeug.security import generate_password_hash, check_password_hash
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+openai_client = None
 if OPENAI_API_KEY:
-    from openai import OpenAI
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
-else:
-    openai_client = None
+    try:
+        from openai import OpenAI
+        openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    except Exception:
+        # Se a inicialização do cliente falhar por qualquer motivo (chave
+        # inválida, dependência incompatível, etc.), o app continua no ar
+        # em modo simulado em vez de derrubar o serviço inteiro.
+        openai_client = None
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "glicocontrol.db")
