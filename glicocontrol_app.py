@@ -1,4 +1,7 @@
 import os
+import re
+import json
+import base64
 import sqlite3
 import random
 from datetime import datetime
@@ -6,6 +9,13 @@ from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, g
 from werkzeug.security import generate_password_hash, check_password_hash
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+if OPENAI_API_KEY:
+    from openai import OpenAI
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+else:
+    openai_client = None
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "glicocontrol.db")
@@ -180,16 +190,72 @@ def dashboard():
     return render_template("dashboard.html", meals=meals, user_name=session.get("user_name"))
 
 
+def analisar_refeicao_com_ia(arquivo_imagem):
+    """Envia a foto da refeição para o modelo de visão da OpenAI e retorna
+    (description, carbs_g, glucose_impact). Lança exceção se a chamada falhar."""
+    imagem_bytes = arquivo_imagem.read()
+    imagem_b64 = base64.b64encode(imagem_bytes).decode("utf-8")
+    mime = arquivo_imagem.mimetype or "image/jpeg"
+
+    prompt = (
+        "Você é um assistente nutricional. Olhe a foto da refeição e responda "
+        "APENAS com um JSON válido, sem texto adicional, no formato exato: "
+        '{"description": "nome curto do prato em português", '
+        '"carbs_g": numero_inteiro_de_gramas_de_carboidrato_estimado, '
+        '"glucose_impact": "Baixo" ou "Moderado" ou "Alto"}'
+    )
+
+    resposta = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{mime};base64,{imagem_b64}"},
+                    },
+                ],
+            }
+        ],
+        max_tokens=200,
+    )
+
+    texto = resposta.choices[0].message.content.strip()
+    # Remove possíveis blocos de código (```json ... ```) que o modelo às vezes adiciona.
+    texto = re.sub(r"^```(json)?|```$", "", texto.strip(), flags=re.MULTILINE).strip()
+    dados = json.loads(texto)
+
+    description = str(dados["description"])[:200]
+    carbs_g = int(dados["carbs_g"])
+    glucose_impact = str(dados["glucose_impact"]).capitalize()
+    if glucose_impact not in ("Baixo", "Moderado", "Alto"):
+        glucose_impact = "Moderado"
+
+    return description, carbs_g, glucose_impact
+
+
 @app.route("/scan", methods=("GET", "POST"))
 @login_required
 def scan():
     if request.method == "POST":
-        # Modo simulado: sem chave de API de IA configurada ainda.
-        # Quando a chave da OpenAI (ou outro provedor de visão) estiver
-        # disponível, troque este bloco pela chamada real à API, enviando
-        # a imagem enviada em request.files["photo"] e usando a resposta
-        # para preencher description / carbs_g / glucose_impact.
-        description, carbs_g, glucose_impact = random.choice(MOCK_FOODS)
+        foto = request.files.get("photo")
+        usar_ia_real = openai_client is not None and foto is not None and foto.filename
+
+        if usar_ia_real:
+            try:
+                description, carbs_g, glucose_impact = analisar_refeicao_com_ia(foto)
+                mensagem = "Refeição analisada pela IA!"
+            except Exception as exc:
+                app.logger.error("Falha na análise por IA: %s", exc)
+                description, carbs_g, glucose_impact = random.choice(MOCK_FOODS)
+                mensagem = "Não consegui analisar a foto agora, usei uma estimativa (modo simulado)."
+        else:
+            # Sem chave de IA configurada (OPENAI_API_KEY) ou sem foto enviada:
+            # cai no modo simulado para não travar a demonstração.
+            description, carbs_g, glucose_impact = random.choice(MOCK_FOODS)
+            mensagem = "Refeição analisada! (modo simulado — IA real ainda não conectada)"
 
         db = get_db()
         db.execute(
@@ -197,7 +263,7 @@ def scan():
             (session["user_id"], description, carbs_g, glucose_impact, datetime.utcnow().isoformat()),
         )
         db.commit()
-        flash("Refeição analisada! (modo simulado — IA real ainda não conectada)", "success")
+        flash(mensagem, "success")
         return redirect(url_for("dashboard"))
 
     return render_template("scan.html")
