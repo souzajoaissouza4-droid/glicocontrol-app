@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Escanear refeição — GlicoControl{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Escanear refeição</h1>
+  <p class="subtitle">
+    Tire uma foto do seu prato. Nossa IA estima os carboidratos e o impacto na sua glicose.
+  </p>
+  <form method="post" enctype="multipart/form-data">
+    <div class="scan-drop">
+      <label for="photo" style="font-weight:600; color:var(--teal-dark); display:block; margin-bottom:10px;">
+        📷 Selecione ou tire uma foto da refeição
+      </label>
+      <input type="file" id="photo" name="photo" accept="image/*" capture="environment">
+      <p style="font-size:0.8rem; margin-top:8px;">
+        Modo simulado: por enquanto o resultado é gerado automaticamente para demonstração.
+        A análise real por IA será conectada em breve.
+      </p>
+    </div>
+    <button type="submit">Analisar refeição</button>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary" style="margin-left:10px;">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

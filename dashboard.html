@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — GlicoControl{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Olá, {{ user_name }} 👋</h1>
+  <p class="subtitle">Aqui está o resumo das suas últimas refeições analisadas.</p>
+  <a href="{{ url_for('scan') }}" class="btn">+ Escanear nova refeição</a>
+</div>
+
+<div class="card">
+  <h2>Últimas refeições</h2>
+  {% if meals %}
+  <table>
+    <thead>
+      <tr>
+        <th>Refeição</th>
+        <th>Carboidratos</th>
+        <th>Impacto na glicose</th>
+        <th>Data</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for meal in meals %}
+      <tr>
+        <td>{{ meal['description'] }}</td>
+        <td>{{ meal['carbs_g'] }} g</td>
+        <td>
+          {% set impacto = meal['glucose_impact']|lower %}
+          <span class="badge badge-{{ impacto }}">{{ meal['glucose_impact'] }}</span>
+        </td>
+        <td>{{ meal['created_at'][:16].replace('T', ' ') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    Nenhuma refeição registrada ainda. Escaneie sua primeira refeição para começar.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
