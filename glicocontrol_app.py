@@ -203,6 +203,11 @@ def scan():
     return render_template("scan.html")
 
 
+# Garante que as tabelas existem sempre que o módulo é carregado, seja rodando
+# diretamente (`python glicocontrol_app.py`) ou importado por um servidor WSGI
+# como o gunicorn (`gunicorn glicocontrol_app:app`), que nunca executa o bloco
+# `if __name__ == "__main__":` abaixo.
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True, host="0.0.0.0", port=5000)
