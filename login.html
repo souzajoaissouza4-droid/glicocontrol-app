@@ -5,6 +5,8 @@
   <h1>Entrar no GlicoControl</h1>
   <p class="subtitle">Controle sua glicose e alimentação com IA.</p>
   <form method="post">
+    <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+
     <label for="email">E-mail</label>
     <input type="email" id="email" name="email" required autofocus>
 

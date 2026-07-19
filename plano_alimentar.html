@@ -40,6 +40,14 @@
   .footer-note { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 30px; }
   .step { display: flex; gap: 12px; margin-bottom: 14px; }
   .step .n { background: var(--teal); color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; flex-shrink: 0; }
+  .ai-card { border: 2px solid var(--teal); }
+  .ai-card h2 { border-bottom-color: var(--teal); }
+  .ai-badge { display: inline-block; background: var(--teal); color: #fff; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; padding: 3px 10px; border-radius: 999px; margin-bottom: 10px; }
+  .ai-plan-text { white-space: pre-wrap; font-size: 0.95rem; line-height: 1.7; }
+  .cta-scan { text-align: center; }
+  .cta-scan a { display: inline-block; margin-top: 12px; background: var(--teal); color: #fff; text-decoration: none; padding: 10px 22px; border-radius: 999px; font-weight: 600; }
+  .progress-track { background: var(--teal-light); border-radius: 999px; height: 8px; overflow: hidden; margin: 12px 0; }
+  .progress-fill { background: var(--teal); height: 100%; }
 </style>
 </head>
 <body>
@@ -59,6 +67,25 @@
         <strong>Aviso importante:</strong> este workbook é uma ferramenta de organização pessoal, não uma prescrição médica ou nutricional. As metas de carboidrato e os ajustes sugeridos aqui devem ser validados com seu médico ou nutricionista, especialmente se você usa insulina ou outros medicamentos.
       </div>
     </div>
+
+    {% if plano_ia %}
+    <div class="card ai-card">
+      <span class="ai-badge">Gerado por IA a partir do seu histórico</span>
+      <h2>Seu plano personalizado</h2>
+      <div class="ai-plan-text">{{ plano_ia }}</div>
+    </div>
+    {% elif erro_ia %}
+    <div class="card">
+      <div class="aviso">{{ erro_ia }}</div>
+    </div>
+    {% else %}
+    <div class="card cta-scan">
+      <h2>Seu plano personalizado ainda não foi gerado</h2>
+      <p>A IA precisa de pelo menos {{ min_refeicoes }} refeições escaneadas no GlicoControl pra identificar seus padrões e montar um plano de verdade pra você. Você já escaneou {{ meals_count }} de {{ min_refeicoes }}.</p>
+      <div class="progress-track"><div class="progress-fill" style="width: {{ (meals_count / min_refeicoes * 100) if min_refeicoes else 0 }}%;"></div></div>
+      <a href="{{ url_for('scan') }}">Escanear uma refeição agora</a>
+    </div>
+    {% endif %}
 
     <div class="card">
       <h2>Como funciona esse plano</h2>

@@ -175,7 +175,7 @@ def login_required(view):
     def wrapped_view(*args, **kwargs):
         if session.get("user_id") is None:
             flash("Faça login para continuar.", "error")
-            return redirect(url_for("login"))
+            return redirect(url_for("login", next=request.path))
         return view(*args, **kwargs)
 
     return wrapped_view
@@ -239,6 +239,9 @@ def login():
             session.clear()
             session["user_id"] = user["id"]
             session["user_name"] = user["name"]
+            destino = request.form.get("next") or request.args.get("next")
+            if destino and destino.startswith("/"):
+                return redirect(destino)
             return redirect(url_for("dashboard"))
 
         flash(error, "error")
@@ -369,9 +372,69 @@ def receitas_low_carb():
     return render_template("receitas_low_carb.html")
 
 
+MIN_REFEICOES_PARA_PLANO_IA = 3
+
+
+def gerar_plano_personalizado_com_ia(meals, user_name):
+    """Usa o histórico real de refeições escaneadas do usuário para gerar um
+    plano alimentar semanal personalizado em texto (Markdown simples).
+    Lança exceção se a chamada à IA falhar."""
+    historico = "\n".join(
+        f"- {m['description']} | carboidrato estimado: {m['carbs_g']}g | impacto na glicose: {m['glucose_impact']}"
+        for m in meals
+    )
+
+    prompt = (
+        f"Você é um assistente nutricional. O usuário se chama {user_name} e este é o "
+        f"histórico real das últimas refeições que ele escaneou no app GlicoControl:\n\n"
+        f"{historico}\n\n"
+        "Com base APENAS nesse histórico (identifique padrões: horários, tipos de "
+        "refeição ou alimentos com impacto alto/moderado na glicose), escreva um plano "
+        "alimentar semanal personalizado em português, em Markdown simples, com:\n"
+        "1) Um parágrafo curto resumindo os padrões que você notou no histórico dele.\n"
+        "2) Uma lista de 3 a 5 ajustes práticos e específicos para essa pessoa (não "
+        "genéricos), citando as refeições do histórico quando fizer sentido.\n"
+        "3) Uma sugestão de cardápio para os próximos 3 dias (café da manhã, almoço, "
+        "lanche, jantar), levando em conta o padrão identificado.\n"
+        "Não inclua avisos médicos (isso já aparece em outro lugar da página). "
+        "Seja direto e específico, evite generalidades."
+    )
+
+    resposta = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=900,
+    )
+    return resposta.choices[0].message.content.strip()
+
+
 @app.route("/plano-alimentar")
+@login_required
 def plano_alimentar():
-    return render_template("plano_alimentar.html")
+    meals = db_query_all(
+        "SELECT * FROM meals WHERE user_id = ? ORDER BY created_at DESC LIMIT 20",
+        (session["user_id"],),
+    )
+
+    plano_ia = None
+    erro_ia = None
+    if len(meals) >= MIN_REFEICOES_PARA_PLANO_IA:
+        if openai_client is not None:
+            try:
+                plano_ia = gerar_plano_personalizado_com_ia(meals, session.get("user_name") or "")
+            except Exception as exc:
+                app.logger.error("Falha ao gerar plano personalizado com IA: %s", exc)
+                erro_ia = "Não consegui gerar seu plano personalizado agora. Tente novamente em instantes."
+        else:
+            erro_ia = "IA ainda não configurada neste ambiente."
+
+    return render_template(
+        "plano_alimentar.html",
+        meals_count=len(meals),
+        min_refeicoes=MIN_REFEICOES_PARA_PLANO_IA,
+        plano_ia=plano_ia,
+        erro_ia=erro_ia,
+    )
 
 
 # Garante que as tabelas existem sempre que o módulo é carregado, seja rodando
