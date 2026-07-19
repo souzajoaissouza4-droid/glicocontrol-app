@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plano Alimentar Personalizado com IA — GlicoControl</title>
+<style>
+  :root {
+    --teal-dark: #0f3d3e;
+    --teal: #1a7a6e;
+    --teal-light: #e8f5f2;
+    --text: #16211f;
+    --muted: #5b6b68;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f4f8f7;
+    color: var(--text);
+    line-height: 1.6;
+  }
+  header.topbar { background: var(--teal-dark); color: #fff; padding: 20px 24px; text-align: center; }
+  header.topbar .brand { font-weight: 700; font-size: 1.2rem; }
+  header.topbar .subtitle { color: #cfe8e3; font-size: 0.9rem; margin-top: 4px; }
+  main { max-width: 780px; margin: 0 auto; padding: 32px 20px 80px; }
+  .card { background: #fff; border-radius: var(--radius); padding: 28px 32px; box-shadow: 0 1px 3px rgba(15, 61, 62, 0.08); margin-bottom: 20px; }
+  .cover { text-align: center; padding: 46px 32px; }
+  .cover h1 { font-size: 1.7rem; color: var(--teal-dark); margin-bottom: 8px; }
+  .cover p { color: var(--muted); }
+  h2 { color: var(--teal-dark); font-size: 1.2rem; border-bottom: 2px solid var(--teal-light); padding-bottom: 8px; margin-top: 0; }
+  .aviso { background: #fff8e6; border: 1px solid #f0d896; border-radius: 10px; padding: 16px 18px; font-size: 0.92rem; color: #6b5210; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { text-align: left; padding: 10px 8px; font-size: 0.88rem; border: 1px solid #eef3f2; vertical-align: top; }
+  th { background: var(--teal-light); color: var(--teal-dark); font-size: 0.78rem; text-transform: uppercase; }
+  .fillbox { min-height: 34px; }
+  .footer-note { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 30px; }
+  .step { display: flex; gap: 12px; margin-bottom: 14px; }
+  .step .n { background: var(--teal); color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; flex-shrink: 0; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">GlicoControl</div>
+    <div class="subtitle">Plano Alimentar Personalizado com IA</div>
+  </header>
+  <main>
+
+    <div class="card cover">
+      <h1>Plano Alimentar Personalizado com IA</h1>
+      <p>Um roteiro guiado para montar sua rotina alimentar usando os escaneamentos de refeição do GlicoControl como base de ajuste semana a semana.</p>
+    </div>
+
+    <div class="card">
+      <div class="aviso">
+        <strong>Aviso importante:</strong> este workbook é uma ferramenta de organização pessoal, não uma prescrição médica ou nutricional. As metas de carboidrato e os ajustes sugeridos aqui devem ser validados com seu médico ou nutricionista, especialmente se você usa insulina ou outros medicamentos.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Como funciona esse plano</h2>
+      <div class="step"><div class="n">1</div><div>Defina sua meta de carboidrato por refeição junto com seu médico/nutricionista (ex.: baixo, moderado, ou uma faixa em gramas).</div></div>
+      <div class="step"><div class="n">2</div><div>Escaneie cada refeição no GlicoControl. A IA estima os carboidratos e classifica o impacto (baixo, moderado, alto).</div></div>
+      <div class="step"><div class="n">3</div><div>Preencha a grade semanal abaixo com o que você planeja comer — isso ajuda a chegar na hora da refeição já com uma direção.</div></div>
+      <div class="step"><div class="n">4</div><div>No fim da semana, compare o que foi escaneado com o que foi planejado e ajuste o que precisar para a próxima semana.</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Suas metas (preencha com orientação profissional)</h2>
+      <table>
+        <tr><th>Refeição</th><th>Meta de carboidrato</th><th>Observações</th></tr>
+        <tr><td>Café da manhã</td><td class="fillbox"></td><td class="fillbox"></td></tr>
+        <tr><td>Almoço</td><td class="fillbox"></td><td class="fillbox"></td></tr>
+        <tr><td>Lanche da tarde</td><td class="fillbox"></td><td class="fillbox"></td></tr>
+        <tr><td>Jantar</td><td class="fillbox"></td><td class="fillbox"></td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Grade semanal de planejamento</h2>
+      <table>
+        <tr><th>Dia</th><th>Café da manhã</th><th>Almoço</th><th>Lanche</th><th>Jantar</th></tr>
+        <tr><td>Segunda</td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td></tr>
+        <tr><td>Terça</td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td></tr>
+        <tr><td>Quarta</td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td></tr>
+        <tr><td>Quinta</td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td></tr>
+        <tr><td>Sexta</td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td></tr>
+        <tr><td>Sábado</td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td></tr>
+        <tr><td>Domingo</td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td><td class="fillbox"></td></tr>
+      </table>
+      <p style="color: var(--muted); font-size: 0.85rem; margin-top: 10px;">Dica: imprima esta página ou copie a tabela para o seu bloco de notas preferido e preencha no início de cada semana.</p>
+    </div>
+
+    <div class="card">
+      <h2>Revisão semanal (compare planejado x escaneado)</h2>
+      <table>
+        <tr><th>Pergunta</th><th>Sua resposta</th></tr>
+        <tr><td>Quantas refeições vieram como "alto impacto" essa semana?</td><td class="fillbox"></td></tr>
+        <tr><td>Teve algum padrão (dia da semana, horário, tipo de refeição)?</td><td class="fillbox"></td></tr>
+        <tr><td>O que vou trocar ou ajustar na próxima semana?</td><td class="fillbox"></td></tr>
+        <tr><td>Como me senti (energia, fome, disposição) essa semana?</td><td class="fillbox"></td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Ajustes práticos comuns</h2>
+      <ul>
+        <li>Se muitas refeições vieram "alto impacto": reduza a porção do carboidrato principal e aumente vegetais/proteína usando o método do prato.</li>
+        <li>Se sentir fome entre refeições: adicione um lanche com proteína e fibra, evitando pular refeições.</li>
+        <li>Se um horário específico do dia costuma vir pior: experimente ajustar o que é consumido antes daquele horário (ex.: café da manhã com mais proteína).</li>
+        <li>Use o histórico do dashboard do GlicoControl para visualizar a evolução ao longo de várias semanas, não só de um dia isolado.</li>
+      </ul>
+    </div>
+
+    <p class="footer-note">GlicoControl — Monitor de Glicose e Alimentação com IA<br>Este material é um guia de organização pessoal e não substitui acompanhamento médico ou nutricional.</p>
+
+  </main>
+</body>
+</html>

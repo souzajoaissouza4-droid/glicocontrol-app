@@ -355,6 +355,25 @@ def scan():
     return render_template("scan.html")
 
 
+# ---------------------------------------------------------------------------
+# Produtos digitais avulsos (order bump / upsell vendidos na Cakto)
+# ---------------------------------------------------------------------------
+
+@app.route("/guia-alimentacao")
+def guia_alimentacao():
+    return render_template("guia_alimentacao.html")
+
+
+@app.route("/receitas-low-carb")
+def receitas_low_carb():
+    return render_template("receitas_low_carb.html")
+
+
+@app.route("/plano-alimentar")
+def plano_alimentar():
+    return render_template("plano_alimentar.html")
+
+
 # Garante que as tabelas existem sempre que o módulo é carregado, seja rodando
 # diretamente (`python glicocontrol_app.py`) ou importado por um servidor WSGI
 # como o gunicorn (`gunicorn glicocontrol_app:app`), que nunca executa o bloco
