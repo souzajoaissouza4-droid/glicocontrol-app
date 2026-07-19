@@ -25,17 +25,44 @@ if OPENAI_API_KEY:
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "glicocontrol.db")
 
-app = Flask(__name__, template_folder=BASE_DIR, static_folder=None)
-app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao")
-
 # ---------------------------------------------------------------------------
 # Banco de dados
 # ---------------------------------------------------------------------------
+# Se a variável de ambiente DATABASE_URL estiver definida (ex.: um Postgres
+# do Render), usamos ela — os dados ficam persistentes de verdade, mesmo
+# quando o serviço "dorme" e acorda de novo (o disco local do Render free
+# tier não é persistente e o SQLite se perderia a cada reinício).
+# Sem DATABASE_URL, cai no SQLite local (bom para rodar na sua máquina).
+DATABASE_URL = os.environ.get("DATABASE_URL")
+USE_POSTGRES = bool(DATABASE_URL)
+
+if USE_POSTGRES:
+    import psycopg2
+    import psycopg2.extras
+
+    # Render às vezes fornece a URL como "postgres://", mas psycopg2 aceita
+    # tanto "postgres://" quanto "postgresql://" normalmente. Mantemos como
+    # veio, só garantindo o sslmode exigido pelo Render.
+    _DB_URL = DATABASE_URL
+
+
+def _pg_connect():
+    conn = psycopg2.connect(_DB_URL, sslmode="require")
+    conn.cursor_factory = psycopg2.extras.RealDictCursor
+    return conn
+
+
+app = Flask(__name__, template_folder=BASE_DIR, static_folder=None)
+app.secret_key = os.environ.get("SECRET_KEY", "troque-esta-chave-em-producao")
+
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
+        if USE_POSTGRES:
+            g.db = _pg_connect()
+        else:
+            g.db = sqlite3.connect(DB_PATH)
+            g.db.row_factory = sqlite3.Row
     return g.db
 
 
@@ -46,34 +73,97 @@ def close_db(exception=None):
         db.close()
 
 
-def init_db():
-    db = sqlite3.connect(DB_PATH)
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-    db.execute(
-        """
-        CREATE TABLE IF NOT EXISTS meals (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            description TEXT NOT NULL,
-            carbs_g INTEGER NOT NULL,
-            glucose_impact TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        )
-        """
-    )
+def _sql(query):
+    """Converte os placeholders '?' (estilo SQLite, usados em todo o código)
+    para '%s' (estilo Postgres/psycopg2) quando estamos usando Postgres."""
+    return query.replace("?", "%s") if USE_POSTGRES else query
+
+
+def db_execute(query, params=()):
+    """Executa um INSERT/UPDATE/DELETE e faz commit."""
+    db = get_db()
+    cur = db.cursor()
+    cur.execute(_sql(query), params)
     db.commit()
-    db.close()
+    cur.close()
+
+
+def db_query_one(query, params=()):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute(_sql(query), params)
+    row = cur.fetchone()
+    cur.close()
+    return row
+
+
+def db_query_all(query, params=()):
+    db = get_db()
+    cur = db.cursor()
+    cur.execute(_sql(query), params)
+    rows = cur.fetchall()
+    cur.close()
+    return rows
+
+
+def init_db():
+    if USE_POSTGRES:
+        conn = _pg_connect()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS meals (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users (id),
+                description TEXT NOT NULL,
+                carbs_g INTEGER NOT NULL,
+                glucose_impact TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    else:
+        db = sqlite3.connect(DB_PATH)
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS meals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                description TEXT NOT NULL,
+                carbs_g INTEGER NOT NULL,
+                glucose_impact TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+            """
+        )
+        db.commit()
+        db.close()
 
 
 # ---------------------------------------------------------------------------
@@ -114,20 +204,15 @@ def signup():
             error = "A senha precisa ter pelo menos 6 caracteres."
 
         if error is None:
-            db = get_db()
-            existing = db.execute(
-                "SELECT id FROM users WHERE email = ?", (email,)
-            ).fetchone()
+            existing = db_query_one("SELECT id FROM users WHERE email = ?", (email,))
             if existing is not None:
                 error = "Já existe uma conta com esse e-mail."
 
         if error is None:
-            db = get_db()
-            db.execute(
+            db_execute(
                 "INSERT INTO users (name, email, password_hash, created_at) VALUES (?, ?, ?, ?)",
                 (name, email, generate_password_hash(password), datetime.utcnow().isoformat()),
             )
-            db.commit()
             flash("Conta criada! Faça login para continuar.", "success")
             return redirect(url_for("login"))
 
@@ -142,8 +227,7 @@ def login():
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
 
-        db = get_db()
-        user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        user = db_query_one("SELECT * FROM users WHERE email = ?", (email,))
 
         error = None
         if user is None:
@@ -187,11 +271,10 @@ MOCK_FOODS = [
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    db = get_db()
-    meals = db.execute(
+    meals = db_query_all(
         "SELECT * FROM meals WHERE user_id = ? ORDER BY created_at DESC LIMIT 10",
         (session["user_id"],),
-    ).fetchall()
+    )
     return render_template("dashboard.html", meals=meals, user_name=session.get("user_name"))
 
 
@@ -262,12 +345,10 @@ def scan():
             description, carbs_g, glucose_impact = random.choice(MOCK_FOODS)
             mensagem = "Refeição analisada! (modo simulado — IA real ainda não conectada)"
 
-        db = get_db()
-        db.execute(
+        db_execute(
             "INSERT INTO meals (user_id, description, carbs_g, glucose_impact, created_at) VALUES (?, ?, ?, ?, ?)",
             (session["user_id"], description, carbs_g, glucose_impact, datetime.utcnow().isoformat()),
         )
-        db.commit()
         flash(mensagem, "success")
         return redirect(url_for("dashboard"))
 
