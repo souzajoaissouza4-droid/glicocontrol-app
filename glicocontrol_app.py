@@ -4,7 +4,7 @@ import json
 import base64
 import sqlite3
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import Flask, render_template, request, redirect, url_for, session, flash, g
@@ -271,6 +271,21 @@ MOCK_FOODS = [
 ]
 
 
+def _resumo_semanal(lista_refeicoes):
+    total = len(lista_refeicoes)
+    altos = sum(1 for m in lista_refeicoes if m["glucose_impact"] == "Alto")
+    moderados = sum(1 for m in lista_refeicoes if m["glucose_impact"] == "Moderado")
+    baixos = sum(1 for m in lista_refeicoes if m["glucose_impact"] == "Baixo")
+    pct_alto = round((altos / total) * 100) if total else 0
+    return {
+        "total": total,
+        "altos": altos,
+        "moderados": moderados,
+        "baixos": baixos,
+        "pct_alto": pct_alto,
+    }
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -278,12 +293,51 @@ def dashboard():
         "SELECT * FROM meals WHERE user_id = ? ORDER BY created_at DESC LIMIT 10",
         (session["user_id"],),
     )
-    return render_template("dashboard.html", meals=meals, user_name=session.get("user_name"))
+
+    agora = datetime.utcnow()
+    inicio_semana_atual = (agora - timedelta(days=7)).isoformat()
+    inicio_semana_anterior = (agora - timedelta(days=14)).isoformat()
+
+    semana_atual = db_query_all(
+        "SELECT * FROM meals WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC",
+        (session["user_id"], inicio_semana_atual),
+    )
+    semana_anterior = db_query_all(
+        "SELECT * FROM meals WHERE user_id = ? AND created_at >= ? AND created_at < ?",
+        (session["user_id"], inicio_semana_anterior, inicio_semana_atual),
+    )
+
+    insights = _resumo_semanal(semana_atual)
+    insights_anterior = _resumo_semanal(semana_anterior)
+
+    tendencia = None
+    if insights["total"] >= 1 and insights_anterior["total"] >= 1:
+        if insights["pct_alto"] < insights_anterior["pct_alto"]:
+            tendencia = "melhorando"
+        elif insights["pct_alto"] > insights_anterior["pct_alto"]:
+            tendencia = "piorando"
+        else:
+            tendencia = "estavel"
+
+    return render_template(
+        "dashboard.html",
+        meals=meals,
+        user_name=session.get("user_name"),
+        insights=insights,
+        tendencia=tendencia,
+    )
+
+
+MOCK_DICAS = {
+    "Baixo": "Ótima escolha! Continue priorizando fibra e proteína nas próximas refeições.",
+    "Moderado": "Impacto moderado — experimente reduzir um pouco a porção do carboidrato principal na próxima refeição parecida.",
+    "Alto": "Impacto alto — na próxima vez, tente combinar esse tipo de prato com mais fibra ou proteína, ou reduzir a porção.",
+}
 
 
 def analisar_refeicao_com_ia(arquivo_imagem):
     """Envia a foto da refeição para o modelo de visão da OpenAI e retorna
-    (description, carbs_g, glucose_impact). Lança exceção se a chamada falhar."""
+    (description, carbs_g, glucose_impact, dica). Lança exceção se a chamada falhar."""
     imagem_bytes = arquivo_imagem.read()
     imagem_b64 = base64.b64encode(imagem_bytes).decode("utf-8")
     mime = arquivo_imagem.mimetype or "image/jpeg"
@@ -293,7 +347,8 @@ def analisar_refeicao_com_ia(arquivo_imagem):
         "APENAS com um JSON válido, sem texto adicional, no formato exato: "
         '{"description": "nome curto do prato em português", '
         '"carbs_g": numero_inteiro_de_gramas_de_carboidrato_estimado, '
-        '"glucose_impact": "Baixo" ou "Moderado" ou "Alto"}'
+        '"glucose_impact": "Baixo" ou "Moderado" ou "Alto", '
+        '"dica": "uma dica prática, curta (máximo 1 frase) e específica sobre essa refeição, em português"}'
     )
 
     resposta = openai_client.chat.completions.create(
@@ -310,7 +365,7 @@ def analisar_refeicao_com_ia(arquivo_imagem):
                 ],
             }
         ],
-        max_tokens=200,
+        max_tokens=300,
     )
 
     texto = resposta.choices[0].message.content.strip()
@@ -323,8 +378,9 @@ def analisar_refeicao_com_ia(arquivo_imagem):
     glucose_impact = str(dados["glucose_impact"]).capitalize()
     if glucose_impact not in ("Baixo", "Moderado", "Alto"):
         glucose_impact = "Moderado"
+    dica = str(dados.get("dica", "")).strip()[:300] or MOCK_DICAS.get(glucose_impact, "")
 
-    return description, carbs_g, glucose_impact
+    return description, carbs_g, glucose_impact, dica
 
 
 @app.route("/scan", methods=("GET", "POST"))
@@ -336,17 +392,19 @@ def scan():
 
         if usar_ia_real:
             try:
-                description, carbs_g, glucose_impact = analisar_refeicao_com_ia(foto)
-                mensagem = "Refeição analisada pela IA!"
+                description, carbs_g, glucose_impact, dica = analisar_refeicao_com_ia(foto)
+                mensagem = f"Refeição analisada pela IA! 💡 {dica}" if dica else "Refeição analisada pela IA!"
             except Exception as exc:
                 app.logger.error("Falha na análise por IA: %s", exc)
                 description, carbs_g, glucose_impact = random.choice(MOCK_FOODS)
-                mensagem = "Não consegui analisar a foto agora, usei uma estimativa (modo simulado)."
+                dica = MOCK_DICAS.get(glucose_impact, "")
+                mensagem = f"Não consegui analisar a foto agora, usei uma estimativa (modo simulado). 💡 {dica}"
         else:
             # Sem chave de IA configurada (OPENAI_API_KEY) ou sem foto enviada:
             # cai no modo simulado para não travar a demonstração.
             description, carbs_g, glucose_impact = random.choice(MOCK_FOODS)
-            mensagem = "Refeição analisada! (modo simulado — IA real ainda não conectada)"
+            dica = MOCK_DICAS.get(glucose_impact, "")
+            mensagem = f"Refeição analisada! (modo simulado — IA real ainda não conectada) 💡 {dica}"
 
         db_execute(
             "INSERT INTO meals (user_id, description, carbs_g, glucose_impact, created_at) VALUES (?, ?, ?, ?, ?)",

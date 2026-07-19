@@ -7,6 +7,27 @@
   <a href="{{ url_for('scan') }}" class="btn">+ Escanear nova refeição</a>
 </div>
 
+{% if insights and insights.total > 0 %}
+<div class="card">
+  <h2>Resumo da semana</h2>
+  <p class="subtitle" style="margin-bottom: 14px;">
+    Você escaneou <strong>{{ insights.total }}</strong> refeiç{{ 'ão' if insights.total == 1 else 'ões' }} nos últimos 7 dias.
+    {% if tendencia == 'melhorando' %}
+      Comparado à semana anterior, sua proporção de refeições de alto impacto <strong>caiu</strong> — bom sinal!
+    {% elif tendencia == 'piorando' %}
+      Comparado à semana anterior, sua proporção de refeições de alto impacto <strong>subiu</strong>. Vale revisar o que mudou.
+    {% elif tendencia == 'estavel' %}
+      A proporção de refeições de alto impacto está estável em relação à semana anterior.
+    {% endif %}
+  </p>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <span class="badge badge-baixo">{{ insights.baixos }} baixo impacto</span>
+    <span class="badge badge-moderado">{{ insights.moderados }} moderado</span>
+    <span class="badge badge-alto">{{ insights.altos }} alto impacto</span>
+  </div>
+</div>
+{% endif %}
+
 <div class="card">
   <h2>Últimas refeições</h2>
   {% if meals %}
